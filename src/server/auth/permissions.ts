@@ -1,7 +1,10 @@
-import "server-only";
-import { getCurrentStaffProfile, type StaffProfile } from "./session";
-
 /**
+ * Pure constants/types/errors — deliberately has NO "server-only" import and
+ * does not touch cookies, the database, or any secret. This is what nav
+ * components (client-side) import to know permission ids for UI filtering;
+ * the actual enforcement (requirePermission) lives in ./guard.ts, which IS
+ * server-only and must never be imported from a client component.
+ *
  * Dot-namespaced permission ids. This list must stay in sync with the rows
  * seeded into the `permissions` table by
  * supabase/migrations/..._seed_permissions_matrix.sql — adding a permission
@@ -42,22 +45,4 @@ export class AuthorizationError extends Error {
     super(message);
     this.name = "AuthorizationError";
   }
-}
-
-/**
- * First line of every privileged Server Action. Throws rather than
- * returning a boolean so a forgotten check fails loudly instead of silently
- * falling through (mirrors the old system's assertRole()/assertAdmin()
- * pattern, but keyed on granular permissions loaded from the database
- * instead of a hardcoded role-name allowlist).
- */
-export async function requirePermission(permission: Permission): Promise<StaffProfile> {
-  const profile = await getCurrentStaffProfile();
-  if (!profile) {
-    throw new AuthenticationError();
-  }
-  if (!profile.permissions.includes(permission)) {
-    throw new AuthorizationError(`Missing permission: ${permission}`);
-  }
-  return profile;
 }
