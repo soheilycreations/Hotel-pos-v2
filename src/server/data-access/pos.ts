@@ -17,6 +17,11 @@ export type OrderSummary = {
   order_status: string;
   table_id: string | null;
   total_amount: number;
+  /** Live sum of order_items.line_total — display-only estimate for
+   * pre-settlement orders, since total_amount is only computed once, by
+   * rpc_settle_pos_order at settlement time. Equals total_amount once the
+   * order is completed/settled. */
+  live_total: number;
   version: number;
   created_at: string;
   table: { name: string } | null;
@@ -55,7 +60,29 @@ export async function getActiveOrders(): Promise<OrderSummary[]> {
   if (error) {
     throw new Error(`Failed to load active orders: ${error.message}`);
   }
-  return (data ?? []) as unknown as OrderSummary[];
+  const orders = (data ?? []) as unknown as Omit<OrderSummary, "live_total">[];
+  if (orders.length === 0) return [];
+
+  const { data: items, error: itemsError } = await supabase
+    .from("order_items")
+    .select("order_id, line_total")
+    .in(
+      "order_id",
+      orders.map((o) => o.id)
+    );
+  if (itemsError) {
+    throw new Error(`Failed to load order totals: ${itemsError.message}`);
+  }
+
+  const liveTotals = new Map<string, number>();
+  for (const item of items ?? []) {
+    liveTotals.set(item.order_id, (liveTotals.get(item.order_id) ?? 0) + Number(item.line_total));
+  }
+
+  return orders.map((order) => ({
+    ...order,
+    live_total: order.order_status === "completed" ? Number(order.total_amount) : (liveTotals.get(order.id) ?? 0),
+  }));
 }
 
 export async function getRestaurantTables(): Promise<RestaurantTable[]> {

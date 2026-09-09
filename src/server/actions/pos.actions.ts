@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/server/auth/guard";
 import { PERMISSIONS } from "@/server/auth/permissions";
 import { colomboToday } from "@/lib/date-helpers";
+import { getOrderById, type OrderDetail } from "@/server/data-access/pos";
 import {
   createOrderSchema,
   addOrderItemSchema,
@@ -40,6 +41,13 @@ const NEXT_STATUS: Record<string, string | undefined> = {
   preparing: "ready",
   ready: "completed",
 };
+
+/** Fetches one order's full detail on demand, for the single-screen POS
+ * terminal to load into its side panel without a page navigation. */
+export async function getOrderDetailAction(orderId: string): Promise<OrderDetail | null> {
+  await requirePermission(PERMISSIONS.POS_ORDERS_READ);
+  return getOrderById(orderId);
+}
 
 export async function createOrder(input: CreateOrderInput): Promise<ActionResult<{ orderId: string }>> {
   const parsed = createOrderSchema.safeParse(input);
@@ -106,7 +114,7 @@ export async function addOrderItem(input: AddOrderItemInput): Promise<ActionResu
   });
   if (error) return fail(error.message);
 
-  revalidatePath(`/pos/orders/${parsed.data.orderId}`);
+  revalidatePath("/pos");
   return { ok: true, data: undefined };
 }
 
@@ -130,7 +138,7 @@ export async function removeOrderItem(input: RemoveOrderItemInput): Promise<Acti
   const { error } = await supabase.from("order_items").delete().eq("id", parsed.data.orderItemId);
   if (error) return fail(error.message);
 
-  revalidatePath(`/pos/orders/${item.order_id}`);
+  revalidatePath("/pos");
   return { ok: true, data: undefined };
 }
 
@@ -169,7 +177,6 @@ export async function advanceOrderStatus(input: OrderStatusStepInput): Promise<A
     .eq("version", parsed.data.expectedVersion);
   if (error) return fail(error.message);
 
-  revalidatePath(`/pos/orders/${parsed.data.orderId}`);
   revalidatePath("/pos");
   return { ok: true, data: undefined };
 }
@@ -189,7 +196,6 @@ export async function settleOrder(input: SettleOrderInput): Promise<ActionResult
   });
   if (error) return fail(error.message);
 
-  revalidatePath(`/pos/orders/${parsed.data.orderId}`);
   revalidatePath("/pos");
   return { ok: true, data: undefined };
 }
@@ -208,7 +214,6 @@ export async function voidOrder(input: VoidOrderInput): Promise<ActionResult> {
   });
   if (error) return fail(error.message);
 
-  revalidatePath(`/pos/orders/${parsed.data.orderId}`);
   revalidatePath("/pos");
   return { ok: true, data: undefined };
 }

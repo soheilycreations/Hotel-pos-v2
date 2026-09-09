@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { voidOrder } from "@/server/actions/pos.actions";
 import { Button } from "@/components/ui/button";
@@ -14,15 +13,19 @@ export function VoidDialog({
   expectedVersion,
   open,
   onOpenChange,
+  onVoided,
 }: {
   orderId: string;
   expectedVersion: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after a successful void — callers decide whether that means
+   * navigating away (standalone order page) or just clearing the selection
+   * (the single-screen terminal, which stays on /pos). */
+  onVoided: () => void;
 }) {
   const [reason, setReason] = useState("");
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
 
   function onConfirm() {
     startTransition(async () => {
@@ -33,7 +36,7 @@ export function VoidDialog({
       }
       toast.success("Order voided");
       onOpenChange(false);
-      router.push("/pos");
+      onVoided();
     });
   }
 

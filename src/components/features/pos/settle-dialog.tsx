@@ -21,12 +21,17 @@ export function SettleDialog({
   subtotal,
   open,
   onOpenChange,
+  onSettled,
 }: {
   orderId: string;
   expectedVersion: number;
   subtotal: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Called after a successful settlement, in addition to the router
+   * refresh — callers whose order data comes from a separate fetch (the
+   * single-screen terminal) use this to re-fetch it explicitly. */
+  onSettled?: () => void;
 }) {
   const [method, setMethod] = useState<(typeof PAYMENT_METHODS)[number]["value"] | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -43,6 +48,7 @@ export function SettleDialog({
       toast.success("Order settled");
       onOpenChange(false);
       router.refresh();
+      onSettled?.();
     });
   }
 
