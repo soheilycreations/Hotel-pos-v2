@@ -13,12 +13,14 @@ import {
   orderStatusStepSchema,
   settleOrderSchema,
   voidOrderSchema,
+  markKotPrintedSchema,
   type CreateOrderInput,
   type AddOrderItemInput,
   type RemoveOrderItemInput,
   type OrderStatusStepInput,
   type SettleOrderInput,
   type VoidOrderInput,
+  type MarkKotPrintedInput,
 } from "@/server/validation/pos.schema";
 
 export type ActionResult<T = undefined> =
@@ -194,6 +196,29 @@ export async function settleOrder(input: SettleOrderInput): Promise<ActionResult
     p_payment_method: parsed.data.paymentMethod,
     p_business_date: colomboToday(),
   });
+  if (error) return fail(error.message);
+
+  revalidatePath("/pos");
+  return { ok: true, data: undefined };
+}
+
+/** Marks the given order_items as sent to the kitchen/bar (kot_printed_at).
+ * Called after the printer has actually been handed the ticket bytes — see
+ * src/hooks/useThermalPrint.ts — never before, so a failed print doesn't
+ * silently mark items as fired. */
+export async function markKotPrinted(input: MarkKotPrintedInput): Promise<ActionResult> {
+  const parsed = markKotPrintedSchema.safeParse(input);
+  if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid input");
+
+  await requirePermission(PERMISSIONS.POS_ORDERS_WRITE);
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("order_items")
+    .update({ kot_printed_at: new Date().toISOString() })
+    .eq("order_id", parsed.data.orderId)
+    .in("id", parsed.data.orderItemIds)
+    .is("kot_printed_at", null);
   if (error) return fail(error.message);
 
   revalidatePath("/pos");

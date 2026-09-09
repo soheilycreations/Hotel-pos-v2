@@ -1,7 +1,8 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 
-export type MenuCategory = { id: string; name: string; sort_order: number };
+export type KitchenStation = "kitchen" | "bar";
+export type MenuCategory = { id: string; name: string; sort_order: number; station: KitchenStation };
 export type MenuItem = {
   id: string;
   category_id: string;
@@ -35,7 +36,8 @@ export type OrderItemRow = {
   quantity: number;
   unit_price: number;
   line_total: number;
-  menu_item: { name: string } | null;
+  kot_printed_at: string | null;
+  menu_item: { name: string; menu_categories: { station: KitchenStation } | null } | null;
 };
 
 export type OrderDetail = OrderSummary & {
@@ -99,7 +101,7 @@ export async function getMenuCategories(): Promise<MenuCategory[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("menu_categories")
-    .select("id, name, sort_order")
+    .select("id, name, sort_order, station")
     .order("sort_order");
 
   if (error) {
@@ -139,7 +141,9 @@ export async function getOrderById(orderId: string): Promise<OrderDetail | null>
 
   const { data: items, error: itemsError } = await supabase
     .from("order_items")
-    .select("id, menu_item_id, is_custom, custom_description, quantity, unit_price, line_total, menu_item:menu_items(name)")
+    .select(
+      "id, menu_item_id, is_custom, custom_description, quantity, unit_price, line_total, kot_printed_at, menu_item:menu_items(name, menu_categories(station))"
+    )
     .eq("order_id", orderId)
     .order("created_at");
 

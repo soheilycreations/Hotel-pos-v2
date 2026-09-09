@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Trash2, UtensilsCrossed } from "lucide-react";
-import { removeOrderItem, advanceOrderStatus } from "@/server/actions/pos.actions";
-import type { OrderDetail } from "@/server/data-access/pos";
+import { Trash2, UtensilsCrossed, ChefHat, Beer, Printer, Check } from "lucide-react";
+import { removeOrderItem, advanceOrderStatus, markKotPrinted } from "@/server/actions/pos.actions";
+import type { OrderDetail, OrderItemRow } from "@/server/data-access/pos";
+import { useThermalPrint } from "@/hooks/useThermalPrint";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,10 @@ const ORDER_STATUS_VARIANT: Record<string, "secondary" | "warning" | "success"> 
   settled: "success",
 };
 
+function pendingByStation(items: OrderItemRow[], station: "kitchen" | "bar") {
+  return items.filter((item) => !item.kot_printed_at && (item.menu_item?.menu_categories?.station ?? "kitchen") === station);
+}
+
 export function OrderPanel({
   order,
   isLoading,
@@ -45,6 +50,7 @@ export function OrderPanel({
   const [isPending, startTransition] = useTransition();
   const [settleOpen, setSettleOpen] = useState(false);
   const [voidOpen, setVoidOpen] = useState(false);
+  const { printStationTicket, printBill, printing } = useThermalPrint();
 
   if (isLoading) {
     return (
@@ -78,6 +84,8 @@ export function OrderPanel({
   const canVoid = !["settled", "voided", "cancelled"].includes(order.order_status);
   const isSettled = order.order_status === "completed" || order.order_status === "settled";
   const liveSubtotal = order.items.reduce((sum, item) => sum + Number(item.line_total), 0);
+  const pendingKitchen = pendingByStation(order.items, "kitchen");
+  const pendingBar = pendingByStation(order.items, "bar");
 
   function onRemoveItem(orderItemId: string) {
     startTransition(async () => {
@@ -96,9 +104,34 @@ export function OrderPanel({
     });
   }
 
+  async function onSendStation(station: "kitchen" | "bar") {
+    if (!order) return;
+    const pending = station === "kitchen" ? pendingKitchen : pendingBar;
+    if (pending.length === 0) return;
+    const sent = await printStationTicket(order, pending, station);
+    if (!sent) {
+      toast.error("Could not reach the printer");
+      return;
+    }
+    const result = await markKotPrinted({ orderId: order.id, orderItemIds: pending.map((i) => i.id) });
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`${station === "kitchen" ? "Kitchen" : "Bar"} ticket sent`);
+    onRefresh();
+  }
+
+  async function onPrintBill() {
+    if (!order) return;
+    const sent = await printBill(order);
+    if (sent) toast.success("Bill sent to printer");
+    else toast.error("Could not reach the printer");
+  }
+
   return (
-    <Card className="xl:sticky xl:top-6">
-      <CardHeader className="flex-row items-center justify-between space-y-0">
+    <Card className="overflow-hidden shadow-md xl:sticky xl:top-6">
+      <CardHeader className="flex-row items-center justify-between space-y-0 border-b border-border bg-muted/30">
         <div>
           <CardTitle>{order.table?.name ?? order.channel_type}</CardTitle>
           <Badge variant={ORDER_STATUS_VARIANT[order.order_status] ?? "secondary"} className="mt-1 capitalize">
@@ -114,7 +147,10 @@ export function OrderPanel({
             {order.items.map((item) => (
               <div key={item.id} className="flex items-start justify-between gap-2 text-sm">
                 <div>
-                  <p className="font-medium leading-snug">{item.is_custom ? item.custom_description : item.menu_item?.name}</p>
+                  <p className="flex items-center gap-1.5 font-medium leading-snug">
+                    {item.is_custom ? item.custom_description : item.menu_item?.name}
+                    {item.kot_printed_at && <Check className="size-3.5 shrink-0 text-success" />}
+                  </p>
                   <p className="num text-xs text-muted-foreground">
                     {item.quantity} × {Number(item.unit_price).toFixed(2)}
                   </p>
@@ -156,6 +192,21 @@ export function OrderPanel({
           )}
         </div>
 
+        {(pendingKitchen.length > 0 || pendingBar.length > 0) && (
+          <div className="flex flex-col gap-2">
+            {pendingKitchen.length > 0 && (
+              <Button variant="outline" onClick={() => onSendStation("kitchen")} isLoading={printing}>
+                <ChefHat /> Send to kitchen ({pendingKitchen.length})
+              </Button>
+            )}
+            {pendingBar.length > 0 && (
+              <Button variant="outline" onClick={() => onSendStation("bar")} isLoading={printing}>
+                <Beer /> Send to bar ({pendingBar.length})
+              </Button>
+            )}
+          </div>
+        )}
+
         <div className="flex flex-col gap-2 pt-1">
           {canAdvance && (
             <Button onClick={onAdvance} isLoading={isPending}>
@@ -163,6 +214,11 @@ export function OrderPanel({
             </Button>
           )}
           {order.order_status === "completed" && <Button onClick={() => setSettleOpen(true)}>Settle</Button>}
+          {isSettled && (
+            <Button variant="outline" onClick={onPrintBill} isLoading={printing}>
+              <Printer /> Print bill
+            </Button>
+          )}
           {canVoid && (
             <Button variant="outline" onClick={() => setVoidOpen(true)}>
               Void order

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Users } from "lucide-react";
 import { createOrder, addOrderItem, getOrderDetailAction } from "@/server/actions/pos.actions";
 import type { RestaurantTable, OrderSummary, MenuCategory, MenuItem, OrderDetail } from "@/server/data-access/pos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,10 +13,17 @@ import { MenuGrid } from "./menu-grid";
 import { OrderPanel } from "./order-panel";
 
 const TABLE_STYLES: Record<string, string> = {
-  vacant: "border-success/40 bg-success/10 hover:bg-success/20",
-  occupied: "border-warning/40 bg-warning/10 hover:bg-warning/20",
-  reserved: "border-primary/40 bg-primary/10 hover:bg-primary/20",
-  billed: "border-destructive/40 bg-destructive/10 hover:bg-destructive/20",
+  vacant: "border-success/30 bg-success/5 hover:border-success/50 hover:bg-success/10",
+  occupied: "border-warning/30 bg-warning/5 hover:border-warning/50 hover:bg-warning/10",
+  reserved: "border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-primary/10",
+  billed: "border-destructive/30 bg-destructive/5 hover:border-destructive/50 hover:bg-destructive/10",
+};
+
+const TABLE_STATUS_DOT: Record<string, string> = {
+  vacant: "bg-success",
+  occupied: "bg-warning",
+  reserved: "bg-primary",
+  billed: "bg-destructive",
 };
 
 export function PosTerminal({
@@ -108,11 +116,19 @@ export function PosTerminal({
         </div>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle>Tables</CardTitle>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {(["vacant", "occupied", "billed"] as const).map((status) => (
+                <span key={status} className="flex items-center gap-1.5 capitalize">
+                  <span className={cn("size-1.5 rounded-full", TABLE_STATUS_DOT[status])} />
+                  {status}
+                </span>
+              ))}
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
               {tables.map((table) => {
                 const order = orders.find((o) => o.table_id === table.id);
                 const isSelected = order?.id === selectedOrderId;
@@ -123,14 +139,22 @@ export function PosTerminal({
                     onClick={() => onTableClick(table)}
                     disabled={isPending}
                     className={cn(
-                      "flex min-w-20 flex-col items-center rounded-md border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-60",
+                      "group relative flex flex-col items-start gap-2 rounded-xl border p-3 text-left shadow-sm transition-all duration-150",
+                      "hover:-translate-y-0.5 hover:shadow-md disabled:pointer-events-none disabled:opacity-60",
                       TABLE_STYLES[table.status],
-                      isSelected && "ring-2 ring-ring"
+                      isSelected && "ring-2 ring-ring ring-offset-2 ring-offset-background"
                     )}
                   >
-                    {table.name}
+                    <span className={cn("absolute right-2.5 top-2.5 size-2 rounded-full", TABLE_STATUS_DOT[table.status])} />
+                    <span className="text-sm font-semibold leading-none">{table.name}</span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Users className="size-3" />
+                      {table.capacity}
+                    </span>
                     {order && (
-                      <span className="num text-xs font-normal opacity-80">LKR {order.live_total.toFixed(2)}</span>
+                      <span className="num text-xs font-semibold text-foreground/80">
+                        LKR {order.live_total.toFixed(2)}
+                      </span>
                     )}
                   </button>
                 );
@@ -140,34 +164,34 @@ export function PosTerminal({
         </Card>
 
         <Card>
-          <CardContent className="space-y-4 pt-6">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle>Add items</CardTitle>
+            <div className="flex items-center gap-2">
+              <label htmlFor="add-qty" className="text-xs text-muted-foreground">
+                Qty
+              </label>
+              <Input
+                id="add-qty"
+                type="number"
+                min={1}
+                value={addQty}
+                onChange={(e) => setAddQty(Math.max(1, Number(e.target.value)))}
+                className="w-16"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
             {!canAddItems && (
-              <p className="text-sm text-muted-foreground">
+              <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
                 {selectedOrderId ? "This order is no longer open for changes." : "Select a table first to add items."}
               </p>
             )}
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <MenuGrid
-                  categories={menuCategories}
-                  items={menuItems}
-                  disabled={!canAddItems || isPending}
-                  onSelectItem={onSelectMenuItem}
-                />
-              </div>
-              <div className="w-20 shrink-0">
-                <label htmlFor="add-qty" className="mb-1 block text-xs text-muted-foreground">
-                  Qty
-                </label>
-                <Input
-                  id="add-qty"
-                  type="number"
-                  min={1}
-                  value={addQty}
-                  onChange={(e) => setAddQty(Math.max(1, Number(e.target.value)))}
-                />
-              </div>
-            </div>
+            <MenuGrid
+              categories={menuCategories}
+              items={menuItems}
+              disabled={!canAddItems || isPending}
+              onSelectItem={onSelectMenuItem}
+            />
           </CardContent>
         </Card>
       </div>

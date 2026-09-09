@@ -36,3 +36,9 @@ export const voidOrderSchema = z.object({
   reason: z.string().min(3, "A reason is required"),
 });
 export type VoidOrderInput = z.infer<typeof voidOrderSchema>;
+
+export const markKotPrintedSchema = z.object({
+  orderId: z.uuid(),
+  orderItemIds: z.array(z.uuid()).min(1),
+});
+export type MarkKotPrintedInput = z.infer<typeof markKotPrintedSchema>;

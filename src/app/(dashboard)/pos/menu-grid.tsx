@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, ChefHat, Beer } from "lucide-react";
 import type { MenuCategory, MenuItem } from "@/server/data-access/pos";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export function MenuGrid({
   const [categoryId, setCategoryId] = useState<string | null>(categories[0]?.id ?? null);
 
   const categoryNameById = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
+  const categoryStationById = useMemo(() => new Map(categories.map((c) => [c.id, c.station])), [categories]);
   const isSearching = query.trim().length > 0;
 
   const visibleItems = isSearching
@@ -52,6 +53,7 @@ export function MenuGrid({
               variant={categoryId === category.id ? "default" : "outline"}
               onClick={() => setCategoryId(category.id)}
             >
+              {category.station === "bar" ? <Beer /> : <ChefHat />}
               {category.name}
             </Button>
           ))}
@@ -60,25 +62,36 @@ export function MenuGrid({
       {visibleItems.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">No items found.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {visibleItems.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => onSelectItem(item.id)}
-              className={cn(
-                "rounded-lg border border-border p-3 text-left text-sm transition-colors hover:bg-accent",
-                "disabled:pointer-events-none disabled:opacity-60"
-              )}
-            >
-              <p className="font-medium leading-snug">{item.name}</p>
-              <p className="num mt-0.5 text-xs text-muted-foreground">
-                LKR {Number(item.selling_price).toFixed(2)}
-                {isSearching ? <span className="ml-1.5">· {categoryNameById.get(item.category_id)}</span> : null}
-              </p>
-            </button>
-          ))}
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          {visibleItems.map((item) => {
+            const station = categoryStationById.get(item.category_id) ?? "kitchen";
+            return (
+              <button
+                key={item.id}
+                type="button"
+                disabled={disabled}
+                onClick={() => onSelectItem(item.id)}
+                className={cn(
+                  "group relative rounded-lg border border-border bg-card p-3 text-left text-sm shadow-sm transition-all duration-150",
+                  "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
+                  "disabled:pointer-events-none disabled:opacity-60"
+                )}
+              >
+                {station === "bar" ? (
+                  <Beer className="absolute right-2.5 top-2.5 size-3.5 text-primary/60" />
+                ) : (
+                  <ChefHat className="absolute right-2.5 top-2.5 size-3.5 text-muted-foreground/50" />
+                )}
+                <p className="pr-5 font-medium leading-snug">{item.name}</p>
+                <p className="num mt-1 text-xs font-semibold text-muted-foreground">
+                  LKR {Number(item.selling_price).toFixed(2)}
+                  {isSearching ? (
+                    <span className="ml-1.5 font-normal">· {categoryNameById.get(item.category_id)}</span>
+                  ) : null}
+                </p>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
