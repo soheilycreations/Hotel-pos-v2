@@ -20,6 +20,7 @@ export const PERMISSIONS = {
   POS_ORDERS_WRITE: "pos.orders.write",
   POS_SETTLE: "pos.settle",
   POS_VOID: "pos.void",
+  POS_MENU_MANAGE: "pos.menu.manage",
   INVENTORY_READ: "inventory.read",
   INVENTORY_ADJUST: "inventory.adjust",
   FINANCE_EXPENSES_READ: "finance.expenses.read",

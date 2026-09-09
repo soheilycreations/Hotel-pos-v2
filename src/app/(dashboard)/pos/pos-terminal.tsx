@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Users } from "lucide-react";
+import { Users, ListPlus } from "lucide-react";
 import { createOrder, addOrderItem, getOrderDetailAction } from "@/server/actions/pos.actions";
 import type { RestaurantTable, OrderSummary, MenuCategory, MenuItem, OrderDetail } from "@/server/data-access/pos";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { MenuGrid } from "./menu-grid";
@@ -110,9 +112,16 @@ export function PosTerminal({
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Point of Sale</h1>
-          <p className="text-sm text-muted-foreground">Tap a vacant table to open an order, or an occupied one to keep adding items.</p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Point of Sale</h1>
+            <p className="text-sm text-muted-foreground">Tap a vacant table to open an order, or an occupied one to keep adding items.</p>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/pos/menu">
+              <ListPlus /> Manage menu
+            </Link>
+          </Button>
         </div>
 
         <Card>
