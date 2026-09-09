@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { type EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
   loginSchema,
@@ -42,6 +43,26 @@ export async function login(input: LoginInput): Promise<ActionResult> {
   }
 
   redirect("/");
+}
+
+/**
+ * Server-side fallback for the token_hash + type link format (Supabase's
+ * current recommended pattern, used when a project's email templates are
+ * customized to link with {{ .TokenHash }} — a paid-plan feature on some
+ * Supabase tiers). On the free tier, the default template instead uses
+ * {{ .ConfirmationURL }}, which redirects with the token in the URL
+ * *fragment* — that path is handled entirely client-side in
+ * src/app/auth/confirm/confirm-client.tsx, since a fragment never reaches
+ * the server. Both paths converge on the same outcome: a session that lets
+ * /set-password work.
+ */
+export async function verifyEmailOtp(tokenHash: string, type: EmailOtpType): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+  if (error) {
+    return { ok: false, error: "invalid_or_expired_link" };
+  }
+  return { ok: true };
 }
 
 export async function logout(): Promise<void> {
